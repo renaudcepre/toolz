@@ -27,9 +27,11 @@ if ! grep -q "$VENV_PATH_LINE" "$HOME/.zshrc"; then
     echo "" >> "$HOME/.zshrc"
     echo "# Added by my-scripts installer" >> "$HOME/.zshrc"
     echo "$VENV_PATH_LINE" >> "$HOME/.zshrc"
-    echo "Virtual environment added to PATH. Please run 'source ~/.zshrc' to apply changes."
+    echo "Virtual environment added to PATH."
 else
     echo "PATH already configured in .zshrc"
 fi
 
-echo "Installation completed! Please run 'source ~/.zshrc' to use the commands in your current shell."
+echo "Installation completed!"
+
+
