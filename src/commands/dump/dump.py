@@ -5,43 +5,28 @@ from pathlib import Path
 import typer
 from rich import print
 from rich.console import Console
+from rich.markdown import Markdown
 
 app = typer.Typer(help="Dump file contents with markdown code blocks")
 console = Console()
 
-DEFAULT_EXCLUSIONS = [
-    ".git",
-    ".idea",
-    ".vscode",
-    "node_modules",
-    ".venv",
+BASE_EXCLUSIONS = [
+    ".*",
+    "__*" "node_modules",
     "venv",
-    "__pycache__",
     "dist",
     "build",
     "*.log",
     "*.tmp",
-    ".DS_Store",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".tox",
-    ".coverage",
     "coverage.xml",
-    ".nyc_output",
     "*.pyc",
     "*.pyo",
     "Thumbs.db",
-    ".sass-cache",
     "*.egg-info",
     "*.lock",
     "package-lock.json",
     "pip-wheel-metadata",
-    ".parcel-cache",
-    ".next",
     "target",
-    ".gradle",
-    ".history",
-    ".ipynb_checkpoints",
 ]
 
 LANGUAGE_MAPPING = {
@@ -76,7 +61,7 @@ def copy_to_clipboard(text: str) -> bool:
                 clip_path = shutil.which("clip.exe")
                 if not clip_path:
                     raise FileNotFoundError("clip.exe not found in PATH")
-                process = subprocess.Popen([clip_path], stdin=subprocess.PIPE) #noqa
+                process = subprocess.Popen([clip_path], stdin=subprocess.PIPE)  # noqa
                 process.communicate(text.encode("utf-16-le"))
                 return True
 
@@ -84,7 +69,7 @@ def copy_to_clipboard(text: str) -> bool:
         xclip_path = shutil.which("xclip")
         if not xclip_path:
             raise FileNotFoundError("xclip not found in PATH")
-        subprocess.run( # noqa
+        subprocess.run(  # noqa
             [xclip_path, "-selection", "clipboard"], input=text.encode(), check=True
         )
         return True
@@ -115,22 +100,22 @@ def dump_content(
         for item in path.iterdir():
             # Skip excluded patterns
             if any(item.match(excl) for excl in exclusions):
-                excluded_files.append(str(item))
+                excluded_files.append(f"`{str(item)}`: _excluded_")
                 continue
 
             if item.is_file():
                 if not item.match(pattern):
-                    excluded_files.append(str(item))
+                    excluded_files.append(f"`{str(item)}`: _do not match {pattern}_")
                     continue
 
                 # Skip binary files
                 if is_binary_file(item):
-                    excluded_files.append(str(item))
+                    excluded_files.append(f"`{str(item)}`: _is binary_")
                     continue
 
                 # Skip empty files
                 if item.stat().st_size == 0:
-                    excluded_files.append(str(item))
+                    excluded_files.append(f"`{str(item)}`: _empty_")
                     continue
 
                 try:
@@ -154,32 +139,50 @@ def dump_content(
 
 @app.callback(invoke_without_command=True)
 def main(
-    path: Path = typer.Argument(..., help="Path to search"),
-    clipboard: bool = typer.Option(
-        False, "--clipboard", "-c", help="Copy output to clipboard"
+    path: Path = typer.Argument(
+        ...,
+        help="Path to search",
     ),
-    pattern: str = typer.Option("*", help="File pattern to match"),
+    clipboard: bool = typer.Option(
+        False,
+        "--clipboard",
+        "-c",
+        help="Copy output to clipboard",
+    ),
+    pretty: bool = typer.Option(
+        False,
+        "--pretty",
+        help="Display markdown markup",
+    ),
+    pattern: str = typer.Option(
+        "*",
+        help="File pattern to match",
+    ),
     exclude: str = typer.Option(
-        ",".join(DEFAULT_EXCLUSIONS), help="Comma-separated paths to exclude"
+        None,
+        help=f"Comma-separated paths to exclude, "
+        f"[default: {",".join(BASE_EXCLUSIONS)}]",
+        show_default=False,
     ),
 ) -> None:
-    """Dump file contents with markdown code blocks."""
+    """Dump file contents with Markdown code blocks."""
     if not path.exists():
         print(f"[red]Error: Path '{path}' does not exist[/red]")
         raise typer.Exit(1)
 
-    exclusions = [p.strip() for p in exclude.split(",")]
+    additional_exclusions = [p.strip() for p in exclude.split(",")] if exclude else []
+    exclusions = list(set(BASE_EXCLUSIONS + additional_exclusions))
     output: list[str] = []
-    excluded_files : list[str] = []
+    excluded_files: list[str] = []
 
     dump_content(path, pattern, exclusions, output, excluded_files)
 
     # Add header with excluded files
     exclusion_footer = [
         "# Excluded Files",
-        "The following files and directories were excluded during the dump:\n```",
-        "\n".join(f"- {file}" for file in excluded_files),
-        "```",
+        "The following files and directories were excluded during the dump:\n",
+        ">-" + "\n >-".join(f" {file}" for file in excluded_files),
+        "",
     ]
 
     header = f"# `{path.absolute()}`\n"
@@ -200,6 +203,14 @@ def main(
                 "[red]Error: Could not copy to clipboard."
                 " No clipboard utility available.[/red]"
             )
-            print(result)
+            _render_result_to_console(result, pretty)
     else:
-        print(result)
+        _render_result_to_console(result, pretty)
+
+
+def _render_result_to_console(result: str, pretty: bool = False) -> None:
+    if not pretty:
+        console.print(result, markup=False)
+    else:
+        md = Markdown(result)
+        console.print(md)
