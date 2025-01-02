@@ -10,9 +10,12 @@ from rich.markdown import Markdown
 app = typer.Typer(help="Dump file contents with markdown code blocks")
 console = Console()
 
+
+
 BASE_EXCLUSIONS = [
     ".*",
-    "__*" "node_modules",
+    "__*",
+    "node_modules",
     "venv",
     "dist",
     "build",
@@ -27,6 +30,7 @@ BASE_EXCLUSIONS = [
     "package-lock.json",
     "pip-wheel-metadata",
     "target",
+    ".output", ".nuxt", ".git"
 ]
 
 LANGUAGE_MAPPING = {
